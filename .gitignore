@@ -38,3 +38,6 @@ config.yaml
 
 # Slurm
 logslurms
+
+data/**
+*.pth
