@@ -22,6 +22,7 @@ from . import utils
 def train(config):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda") if use_cuda else torch.device("cpu")
+    print(f"Using device {device}")
 
     if "wandb" in config["logging"]:
         wandb_config = config["logging"]["wandb"]
@@ -70,7 +71,10 @@ def train(config):
         yaml.dump(config, file)
 
     # Make a summary script of the experiment
-    input_size = next(iter(train_loader))[0].shape
+    images, _ = next(iter(train_loader))
+    device = next(model.parameters()).device
+    images = images.to(device)
+    model_summary = torchinfo.summary(model, input_data=images)
     summary_text = (
         f"Logdir : {logdir}\n"
         + "## Command \n"
@@ -79,12 +83,12 @@ def train(config):
         + f" Config : {config} \n\n"
         + (f" Wandb run name : {wandb.run.name}\n\n" if wandb_log is not None else "")
         + "## Summary of the model architecture\n"
-        + f"{torchinfo.summary(model, input_size=input_size)}\n\n"
+        + f"{model_summary}\n\n"
         + "## Loss\n\n"
         + f"{loss}\n\n"
         + "## Datasets : \n"
-        + f"Train : {train_loader.dataset.dataset}\n"
-        + f"Validation : {valid_loader.dataset.dataset}"
+        + f"Train : {train_loader.dataset}\n"
+        + f"Validation : {valid_loader.dataset}"
     )
     with open(logdir / "summary.txt", "w") as f:
         f.write(summary_text)
@@ -102,23 +106,30 @@ def train(config):
         train_loss = utils.train(model, train_loader, loss, optimizer, device)
 
         # Test
-        test_loss = utils.test(model, valid_loader, loss, device)
+        test_loss, test_dice, test_iou = utils.test(model, valid_loader, loss, device, num_classes)
 
         updated = model_checkpoint.update(test_loss)
+        
         logging.info(
-            "[%d/%d] Test loss : %.3f %s"
+            "[%d/%d] Test Loss: %.3f | Dice: %.3f | IoU: %.3f %s"
             % (
                 e,
                 config["nepochs"],
                 test_loss,
+                test_dice,
+                test_iou,
                 "[>> BETTER <<]" if updated else "",
             )
         )
 
         # Update the dashboard
-        metrics = {"train_CE": train_loss, "test_CE": test_loss}
+        metrics = {
+            "train_loss": train_loss, 
+            "test_loss": test_loss,
+            "test_dice": test_dice,
+            "test_iou": test_iou
+        }
         if wandb_log is not None:
-            logging.info("Logging on wandb")
             wandb_log(metrics)
 
 
