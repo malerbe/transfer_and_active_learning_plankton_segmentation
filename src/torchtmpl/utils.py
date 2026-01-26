@@ -7,6 +7,8 @@ import os
 import torch
 import torch.nn
 import tqdm
+import torch.nn.functional as F
+import numpy as np
 
 
 def generate_unique_logpath(logdir, raw_run_name):
@@ -60,40 +62,38 @@ class ModelCheckpoint(object):
             return True
         return False
 
-def compute_segmentation_metrics(outputs, targets, num_classes):
+def compute_segmentation_metrics(outputs, targets, num_classes=None):
     """
-    Compute Dice and IoU for a batch.
-    outputs: (B, C, H, W) logits
-    targets: (B, H, W) integer indices
+    Calcule le Dice et l'IoU moyen pour un batch binaire.
+    outputs : [Batch, 1, H, W] (doit être binaire 0 ou 1)
+    targets : [Batch, 1, H, W] (doit être binaire 0 ou 1)
     """
-    # Convert logits to class predictions
-    preds = torch.argmax(outputs, dim=1)  # (B, H, W)
+    # On s'assure qu'on travaille sur des tenseurs plats par image
+    # [B, 1, H, W] -> [B, H*W]
+    outputs = outputs.view(outputs.size(0), -1)
+    targets = targets.view(targets.size(0), -1)
+
+    # Intersection : pixels à 1 dans les deux
+    intersection = (outputs * targets).sum(dim=1)  # Somme par image
     
-    # Init accumulators
-    dices = []
-    ious = []
+    # Unions pour Dice et IoU
+    # Somme des pixels à 1 dans l'output + dans la target
+    total_pixels = outputs.sum(dim=1) + targets.sum(dim=1)
+    
+    union = total_pixels - intersection # Pour IoU (A + B - AinterB)
 
-    # Iterate over classes (skip background 0 if needed, here we keep all)
-    # Note: If you want to ignore background, start range at 1
-    for cls in range(num_classes):
-        pred_inds = (preds == cls)
-        target_inds = (targets == cls)
-        
-        intersection = (pred_inds & target_inds).float().sum()
-        union = (pred_inds | target_inds).float().sum()
-        
-        # Dice: 2*Inter / (Area_pred + Area_target)
-        # Add epsilon to avoid division by zero
-        pred_sum = pred_inds.float().sum()
-        target_sum = target_inds.float().sum()
-        dice = (2. * intersection + 1e-8) / (pred_sum + target_sum + 1e-8)
-        dices.append(dice.item())
+    # --- DICE ---
+    # Formule : 2*Inter / (Sum_A + Sum_B)
+    # On ajoute 1e-8 pour éviter la division par 0
+    dice = (2.0 * intersection) / (total_pixels + 1e-8)
+    
+    # --- IoU ---
+    # Formule : Inter / Union
+    iou = (intersection) / (union + 1e-8)
 
-        # IoU: Inter / Union
-        iou = (intersection + 1e-8) / (union + 1e-8)
-        ious.append(iou.item())
+    # On retourne la MOYENNE sur le batch
+    return dice.mean().item(), iou.mean().item()
 
-    return np.mean(dices), np.mean(ious)
 
 def train(model, loader, f_loss, optimizer, device, dynamic_display=True):
     """
@@ -120,6 +120,11 @@ def train(model, loader, f_loss, optimizer, device, dynamic_display=True):
 
     for inputs, targets in pbar:
         inputs, targets = inputs.to(device), targets.to(device)
+
+        if len(targets.shape) == 3:
+            targets = targets.unsqueeze(1)
+
+        targets = (targets > 0).float()
 
         # Compute the forward propagation
         outputs = model(inputs)
@@ -164,22 +169,33 @@ def test(model, loader, f_loss, device, num_classes):
     num_batches = 0
 
     with torch.no_grad(): 
-        for (inputs, targets) in loader:
+        pbar = tqdm.tqdm(loader, desc="Test", leave=True)
+        for (inputs, targets) in pbar:
             inputs, targets = inputs.to(device), targets.to(device)
+
+            if len(targets.shape) == 3:
+                targets = targets.unsqueeze(1)
+
+            targets = (targets > 0).float()
 
             # Compute the forward propagation
             outputs = model(inputs)
             loss = f_loss(outputs, targets)
+
+            probs = torch.sigmoid(outputs)
+            preds_mask = (probs > 0.5).float()
 
             # Update Loss
             batch_size = inputs.shape[0]
             total_loss += batch_size * loss.item()
             num_samples += batch_size
 
-            dice, iou = compute_segmentation_metrics(outputs, targets, num_classes)
+            dice, iou = compute_segmentation_metrics(preds_mask, targets, num_classes)
             total_dice += dice
             total_iou += iou
             num_batches += 1
+            
+            pbar.set_description(f"Test loss : {total_loss/num_samples:.4f}")
     
     avg_loss = total_loss / num_samples
     avg_dice = total_dice / num_batches

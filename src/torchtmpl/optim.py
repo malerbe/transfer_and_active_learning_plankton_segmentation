@@ -13,9 +13,11 @@ class DiceLoss(nn.Module):
     def forward(self, y_pred, y_true):
         return self.loss_fn(y_pred, y_true)
 
-nn.DiceLoss = DiceLoss # surcharger la los de base
+nn.DiceLoss = DiceLoss # surcharger la loss de base
 
 def get_loss(lossname):
+    if lossname == "TverskyLoss":
+        return smp_losses.TverskyLoss(mode="binary", alpha=0.7, beta=0.3, from_logits=True)
     return eval(f"nn.{lossname}()")
 
 

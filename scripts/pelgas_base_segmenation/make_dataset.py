@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 
 # configuration
 INPUT_DATASET = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\data\pelgas_dataset_temp\101141\individual_images"
-OUTPUT_DATASET = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\data\segmentation_dataset"
+OUTPUT_DATASET = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\data\segmentation_dataset_cropped"
 #SAM_MODEL = "./sam_vit_b_01ec64.pth"
 SAM_MODEL = "./sam_vit_h_4b8939.pth"
-IMGS_BY_CLASS = 10 # max nbr of images taken in each class to build the dataset
+IMGS_BY_CLASS = 40 # max nbr of images taken in each class to build the dataset
 BOTTOM_TOLERANCE = 20
 USE_SAM = False
 
@@ -171,21 +171,26 @@ for _class in tqdm(classes):
             # keep best mask
             best_idx = np.argmax(scores)
             final_mask = masks[best_idx].astype(np.uint8) * 255
+        
+        # crop image
+        img_cropped = img[y_min:y_max, x_min:x_max]
+
+        if USE_SAM:
+            mask_cropped = final_mask[y_min:y_max, x_min:x_max]
+        else:
+            mask_full = mask_uint8 * 255
+            mask_cropped = mask_full[y_min:y_max, x_min:x_max]
+
 
         # plt.imshow(final_mask)
         # plt.show()
         
         ## 3. Save image and predicted mask
-        if USE_SAM:
-            name = f"{class_name}__{img_path.name}"
-            cv2.imwrite(str(output_imgs / name), img)
-            mask_name = name.replace(".jpg", ".png")
-            cv2.imwrite(str(output_masks / mask_name), final_mask)
-        else:
-            name = f"{class_name}__{img_path.name}"
-            cv2.imwrite(str(output_imgs / name), img)
-            mask_name = name.replace(".jpg", ".png")
-            cv2.imwrite(str(output_masks / mask_name), mask_uint8 * 255)
+        name = f"{class_name}__{img_path.name}"
+        mask_name = name.replace(".jpg", ".png")
+
+        cv2.imwrite(str(output_imgs / name), img_cropped)
+        cv2.imwrite(str(output_masks / mask_name), mask_cropped)
 
         total += 1
 

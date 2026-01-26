@@ -3,6 +3,7 @@
 # Standard imports
 import logging
 import random
+import os
 
 # External imports
 import torch
@@ -19,25 +20,30 @@ from torchvision.datasets import ImageFolder
 
 class PelgasDataset(Dataset):
     def __init__(self, samples, transform=None):
-        self.samples = samples
+        self.samples = samples 
         self.transform = transform
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        image = cv2.imread(path)
+        img_path, mask_path = self.samples[idx] 
+        
+        image = cv2.imread(img_path)
         if image is None:
-            raise FileNotFoundError(f"Image introuvable : {path}")
-            
+            raise FileNotFoundError(f"Image introuvable : {img_path}")
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        if self.transform:
-            augmented = self.transform(image=image)
-            image = augmented['image']
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE) 
+        if mask is None:
+             raise FileNotFoundError(f"Masque introuvable : {mask_path}")
 
-        return image, label
+        if self.transform:
+            augmented = self.transform(image=image, mask=mask)
+            image = augmented['image']
+            mask = augmented['mask']
+        
+        return image, mask
 
 
 def show_image(X):
@@ -50,37 +56,59 @@ def get_train_transforms(data_config):
     resize = data_config["resize"]
 
     return A.Compose([
-        A.Resize(height=resize, width=resize),
-
+        # --- 1. GÉOMÉTRIE ---
+        A.Resize(width=resize, height=resize),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.Rotate(limit=180, p=0.7, border_mode=cv2.BORDER_CONSTANT),
-        A.ElasticTransform(alpha=1, sigma=50, p=0.3),
+        A.Rotate(limit=180, p=0.7, border_mode=cv2.BORDER_CONSTANT), 
+        
+        # Déformation élastique légère (simule le mouvement de l'eau/corps mous)
+        A.ElasticTransform(alpha=1, sigma=30, p=0.3), 
 
+        # --- 2. ARTEFACTS (NOUVEAU) ---
+        # Simule des poussières / saletés sur l'objectif ou dans l'eau
+        # On crée entre 1 et 15 petits points noirs (ou gris foncé)
         A.CoarseDropout(
-            num_holes_range=(2, 15),    
-            hole_height_range=(2, 10),  
-            hole_width_range=(2, 10),    
-            fill_value=0, 
-            mask_fill_value=None, 
+            max_holes=8,       # Max nb de poussières
+            min_holes=2,        # Min nb de poussières
+            max_height=8,      # Taille max (pixels)
+            max_width=8, 
+            min_height=2,       # Taille min (pixels)
+            min_width=2,
+            fill_value=0,       # 0 = Noir (poussière opaque), ou mettre 'random'
+            mask_fill_value=None, # Ne touche pas au masque ! (IMPORTANT)
             p=0.6
         ),
 
-        A.Downscale(scale_range=(0.5, 0.9), p=0.4),
+        # --- 3. DÉGRADATION & BRUIT ---
+        
+        # Réduction de résolution (simule une optique bas de gamme)
+        A.Downscale(scale_range=(0.8, 0.95), p=0.4),
         
         A.OneOf([
-            A.MotionBlur(blur_limit=5, p=0.5),   
-            A.GaussianBlur(blur_limit=(3, 5), p=0.5), 
+            A.MotionBlur(blur_limit=3, p=0.5),   
+            A.GaussianBlur(blur_limit=(3, 3), p=0.5), 
         ], p=0.3),
         
+        # Bruit de capteur (Remplacement de GaussNoise pour éviter l'erreur)
         A.OneOf([
-            A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), p=0.5),
-            A.MultiplicativeNoise(multiplier=(0.9, 1.1), elementwise=True, p=0.5),
+            # Simulation de bruit ISO (grain photo) - très réaliste
+            A.ISONoise(color_shift=(0.01, 0.02), intensity=(0.05, 0.3), p=0.5),
+            
+            # Bruit multiplicatif (variation de sensibilité locale)
+            A.MultiplicativeNoise(multiplier=(0.95, 1.05), elementwise=True, p=0.5),
         ], p=0.5),
 
-        A.ImageCompression(quality_range=(40, 80), p=0.4),
+        # Compression JPEG (Artefacts de blocs carrés)
+        A.ImageCompression(quality_range=(70, 95), p=0.4),
 
-        A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+        # --- 4. LUMIÈRE ---
+        A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.4),
+        
+        # --- 5. FINITION : FORCER LE GRIS ---
+        # Convertit tout (y compris le bruit coloré ISO) en gris pur
+        A.ToGray(p=1.0),
+    
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)), 
         ToTensorV2() 
     ])
@@ -90,8 +118,8 @@ def get_valid_transforms(data_config):
 
     return A.Compose([
         A.Resize(width=resize, height=resize),
-        A.ToGray(p=1.0),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        A.ToGray(p=1.0),
         ToTensorV2()
     ])
 
@@ -102,13 +130,43 @@ def get_dataloaders(data_config, use_cuda):
     batch_size = data_config["batch_size"]
     num_workers = data_config["num_workers"]
     resize = data_config["resize"]
+    root_dir = data_config["trainpath"]
+
+    img_dir = os.path.join(root_dir, "imgs")
+    mask_dir = os.path.join(root_dir, "masks")
+
+    if not os.path.exists(img_dir) or not os.path.exists(mask_dir):
+        raise FileNotFoundError(f"Couldn't find 'imgs' or 'masks' in {root_dir}")
+
+    img_names = sorted(os.listdir(img_dir))
+    mask_names = sorted(os.listdir(mask_dir))
+
 
     logging.info("  - Dataset creation")
 
-    raw_dataset = ImageFolder(root=data_config["trainpath"])
+    # create tuples (img, mask)
+    all_samples = []
+    for img_name in img_names:
+        img_path = os.path.join(img_dir, img_name)
+        mask_path = os.path.join(mask_dir, img_name)
+        
+        if not os.path.exists(mask_path):
+            base_name = os.path.splitext(img_name)[0]
+            possible_exts = ['.png', '.jpg', '.jpeg', '.bmp', '.tif']
+            found = False
+            for ext in possible_exts:
+                potential_path = os.path.join(mask_dir, base_name + ext)
+                if os.path.exists(potential_path):
+                    mask_path = potential_path
+                    found = True
+                    break
+            if not found:
+                logging.warning(f"Masque non trouvé pour {img_name}, ignoré.")
+                continue
 
-    all_samples = raw_dataset.samples
-    classes = raw_dataset.classes
+        all_samples.append((img_path, mask_path))  
+    
+    logging.info(f"  - {len(all_samples)} pairs found.")
 
     random.seed(42) 
     random.shuffle(all_samples)
@@ -148,7 +206,7 @@ def get_dataloaders(data_config, use_cuda):
 
     
 
-    num_classes = len(classes)
-    input_size = (1, resize, resize)
+    num_classes = 1
+    input_size = (3, resize, resize)
 
     return train_loader, valid_loader, input_size, num_classes

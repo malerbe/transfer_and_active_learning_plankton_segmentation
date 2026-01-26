@@ -2,14 +2,14 @@ nepochs: 50
 seed: 42
 
 data:
-  trainpath: "./data/segmentation_dataset"
+  trainpath: "./data/segmentation_dataset_cropped"
   batch_size: 8        
   num_workers: 4    
   valid_ratio: 0.2
   resize: 224
 
 model:
-  class: "Unet"
+  class: "DeepLabV3Plus"
   backbone: "resnet34"
   pretrained: true
 
@@ -19,7 +19,7 @@ optim:
     lr: 0.0001
     weight_decay: 0.01 
 
-loss: "DiceLoss"
+loss: "TverskyLoss"
 
 logging:
   logdir: "./logs"      

@@ -90,7 +90,7 @@ def train(config):
         + f"Train : {train_loader.dataset}\n"
         + f"Validation : {valid_loader.dataset}"
     )
-    with open(logdir / "summary.txt", "w") as f:
+    with open(logdir / "summary.txt", "w", encoding='utf-8') as f:
         f.write(summary_text)
     logging.info(summary_text)
     if wandb_log is not None:
@@ -111,7 +111,7 @@ def train(config):
         updated = model_checkpoint.update(test_loss)
         
         logging.info(
-            "[%d/%d] Test Loss: %.3f | Dice: %.3f | IoU: %.3f %s"
+            "[%d/%d] Test Loss: %.5f | Dice: %.5f | IoU: %.5f %s"
             % (
                 e,
                 config["nepochs"],
