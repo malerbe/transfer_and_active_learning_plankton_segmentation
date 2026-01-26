@@ -41,3 +41,8 @@ logslurms
 
 data/**
 *.pth
+
+
+
+*.jpg
+*.png
