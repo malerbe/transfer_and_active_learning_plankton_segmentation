@@ -12,10 +12,10 @@ import cv2
 
 # Active Learning Configuration
 N_ITERATIONS = 5
-SAMPLES_PER_ITER = 10
+SAMPLES_PER_ITER = 20
 UNLABELLED_POOL = "./active_learning/pool_unlabelled"
 LABELLED_POOL = "./active_learning/pool_labelled"
-PRE_TRAINED_MODEL = r".\logs\DeepLabV3Plus_6\best_model.pt"
+PRE_TRAINED_MODEL = r".\logs\DeepLabV3Plus_13\best_model.pt"
 
 # Model configuration
 MODEL_ARCH = "DeepLabV3Plus"      
@@ -236,6 +236,7 @@ def main():
     labeled_img_dir = os.path.join(LABELLED_POOL, "images")
     labeled_mask_dir = os.path.join(LABELLED_POOL, "masks")
 
+    models_scores = []
 
     for cycle in range(1, N_ITERATIONS + 1):
         print("=====================================")
@@ -257,6 +258,9 @@ def main():
 
         print("moving labelled images from unlabelled pool to labelled pool")
         move_files_to_labeled_pool(uncertain_samples, labeled_mask_dir, labeled_img_dir)
+
+        models_scores = input("\n>>> Enter last model performance (Dice Score) : ").strip()
+        print(models_scores)
 
         while True:
             user_input = input("\n>>> PATH to new model : ").strip()

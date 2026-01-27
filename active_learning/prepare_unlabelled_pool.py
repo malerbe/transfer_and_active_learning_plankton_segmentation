@@ -6,7 +6,7 @@ import shutil
 # Configuration:
 PATH_TO_UNLABELLED_DATASET = r"./data/original_dataset/train"
 POOL_UNLABELLED_PATH = r"./active_learning/pool_unlabelled"
-MAX_IMG_BY_CLASS = 20
+MAX_IMG_BY_CLASS = 300
 
 # Get classes
 classes = [_class.replace("\\", "/").split("/")[-1] for _class in glob.glob(PATH_TO_UNLABELLED_DATASET + "/*")]

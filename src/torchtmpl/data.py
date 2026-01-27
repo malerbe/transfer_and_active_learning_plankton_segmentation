@@ -15,7 +15,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import cv2
 import matplotlib.pyplot as plt
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision.datasets import ImageFolder
 
 class PelgasDataset(Dataset):
@@ -123,6 +123,41 @@ def get_valid_transforms(data_config):
         ToTensorV2()
     ])
 
+def collect_samples_from_dir(root_dir):
+    img_dir = os.path.join(root_dir, "imgs")
+    mask_dir = os.path.join(root_dir, "masks") # Ou "masks" selon ton arborescence active learning
+    
+    # Support pour le dossier Active Learning qui s'appelle souvent pool_labelled/images et pool_labelled/masks
+    if not os.path.exists(img_dir):
+        img_dir = os.path.join(root_dir, "images")
+    
+    if not os.path.exists(img_dir) or not os.path.exists(mask_dir):
+        logging.warning(f"Ignored folder (couldn't find imgs/masks) : {root_dir}")
+        return []
+
+    img_names = sorted(os.listdir(img_dir))
+    samples = []
+
+    for img_name in img_names:
+        img_path = os.path.join(img_dir, img_name)
+        
+        base_name = os.path.splitext(img_name)[0]
+        possible_names = [img_name, base_name + ".png", base_name + ".jpg"]
+        
+        mask_path = None
+        for pname in possible_names:
+            p = os.path.join(mask_dir, pname)
+            if os.path.exists(p):
+                mask_path = p
+                break
+        
+        if mask_path:
+            samples.append((img_path, mask_path))
+        else:
+            # logging.debug(f"Masque manquant pour {img_name}")
+            pass
+            
+    return samples
 
 
 def get_dataloaders(data_config, use_cuda):
@@ -131,82 +166,183 @@ def get_dataloaders(data_config, use_cuda):
     num_workers = data_config["num_workers"]
     resize = data_config["resize"]
     root_dir = data_config["trainpath"]
+    active_learning = data_config.get("active_learning", False)
+    
 
-    img_dir = os.path.join(root_dir, "imgs")
-    mask_dir = os.path.join(root_dir, "masks")
+    if not active_learning:
+        img_dir = os.path.join(root_dir, "imgs")
+        mask_dir = os.path.join(root_dir, "masks")
 
-    if not os.path.exists(img_dir) or not os.path.exists(mask_dir):
-        raise FileNotFoundError(f"Couldn't find 'imgs' or 'masks' in {root_dir}")
+        if not os.path.exists(img_dir) or not os.path.exists(mask_dir):
+            raise FileNotFoundError(f"Couldn't find 'imgs' or 'masks' in {root_dir}")
 
-    img_names = sorted(os.listdir(img_dir))
-    mask_names = sorted(os.listdir(mask_dir))
+        img_names = sorted(os.listdir(img_dir))
+        mask_names = sorted(os.listdir(mask_dir))
 
 
-    logging.info("  - Dataset creation")
+        logging.info("  - Dataset creation")
 
-    # create tuples (img, mask)
-    all_samples = []
-    for img_name in img_names:
-        img_path = os.path.join(img_dir, img_name)
-        mask_path = os.path.join(mask_dir, img_name)
+        # create tuples (img, mask)
+        all_samples = []
+        for img_name in img_names:
+            img_path = os.path.join(img_dir, img_name)
+            mask_path = os.path.join(mask_dir, img_name)
+            
+            if not os.path.exists(mask_path):
+                base_name = os.path.splitext(img_name)[0]
+                possible_exts = ['.png', '.jpg', '.jpeg', '.bmp', '.tif']
+                found = False
+                for ext in possible_exts:
+                    potential_path = os.path.join(mask_dir, base_name + ext)
+                    if os.path.exists(potential_path):
+                        mask_path = potential_path
+                        found = True
+                        break
+                if not found:
+                    logging.warning(f"Masque non trouvé pour {img_name}, ignoré.")
+                    continue
+
+            all_samples.append((img_path, mask_path))  
         
-        if not os.path.exists(mask_path):
-            base_name = os.path.splitext(img_name)[0]
-            possible_exts = ['.png', '.jpg', '.jpeg', '.bmp', '.tif']
-            found = False
-            for ext in possible_exts:
-                potential_path = os.path.join(mask_dir, base_name + ext)
-                if os.path.exists(potential_path):
-                    mask_path = potential_path
-                    found = True
-                    break
-            if not found:
-                logging.warning(f"Masque non trouvé pour {img_name}, ignoré.")
-                continue
+        logging.info(f"  - {len(all_samples)} pairs found.")
 
-        all_samples.append((img_path, mask_path))  
-    
-    logging.info(f"  - {len(all_samples)} pairs found.")
+        random.seed(42) 
+        random.shuffle(all_samples)
 
-    random.seed(42) 
-    random.shuffle(all_samples)
+        num_valid = int(valid_ratio * len(all_samples))
+        train_samples = all_samples[num_valid:]
+        valid_samples = all_samples[:num_valid]
 
-    num_valid = int(valid_ratio * len(all_samples))
-    train_samples = all_samples[num_valid:]
-    valid_samples = all_samples[:num_valid]
+        train_ds = PelgasDataset(
+            samples = train_samples, 
+            transform=get_train_transforms(data_config)
+        )
 
-    train_ds = PelgasDataset(
-        samples = train_samples, 
-        transform=get_train_transforms(data_config)
-    )
+        valid_ds = PelgasDataset(
+            samples = valid_samples, 
+            transform=get_valid_transforms(data_config)
+        )
 
-    valid_ds = PelgasDataset(
-        samples = valid_samples, 
-        transform=get_valid_transforms(data_config)
-    )
+        train_loader = torch.utils.data.DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=use_cuda,
+        )
 
-    train_loader = torch.utils.data.DataLoader(
-        train_ds,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=use_cuda,
-    )
-
-    valid_loader = torch.utils.data.DataLoader(
-        valid_ds,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=num_workers,
-        pin_memory=use_cuda,
-    )
+        valid_loader = torch.utils.data.DataLoader(
+            valid_ds,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=use_cuda,
+        )
 
 
-    logging.info(f"  - Train size: {len(train_ds)}, Valid size: {len(valid_ds)}")
+        logging.info(f"  - Train size: {len(train_ds)}, Valid size: {len(valid_ds)}")
 
-    
+        
 
-    num_classes = 1
-    input_size = (3, resize, resize)
+        num_classes = 1
+        input_size = (3, resize, resize)
 
-    return train_loader, valid_loader, input_size, num_classes
+        return train_loader, valid_loader, input_size, num_classes
+
+    else:
+        # Chemins
+        original_data_path = data_config["trainpath"]
+        active_learning_path = data_config.get("al_path", "./active_learning/pool_labelled")
+        
+        # Facteur de poids pour les nouvelles données (ex: 10 signifie qu'une image AL 
+        # a 10x plus de chances d'être piochée qu'une image normale)
+        al_weight_factor = data_config.get("al_weight", 10.0) 
+
+        logging.info("--- Data Loading ---")
+
+        # 1. Récupération des données ORIGINALES
+        original_samples = collect_samples_from_dir(original_data_path)
+        logging.info(f"  - Original dataset: {len(original_samples)} samples found.")
+
+        # 2. Récupération des données ACTIVE LEARNING
+        al_samples = collect_samples_from_dir(active_learning_path)
+        logging.info(f"  - Active Learning dataset: {len(al_samples)} samples found.")
+
+        # 3. Split Train/Val sur les données ORIGINALES uniquement
+        # On veut que le set de validation reste stable pour comparer les performances
+        val_stratified_path = data_config.get("val_path", r".\active_learning\validation_data_stratified")
+        valid_samples = collect_samples_from_dir(val_stratified_path)
+
+        if len(valid_samples) > 0:
+            logging.info(f"  - Using Stratified Validation Set: {len(valid_samples)} samples.")
+            # Si on a un set de validation externe, on utilise TOUT le dataset original pour le train
+            train_samples_orig = original_samples
+        else:
+            # FALLBACK : Si le dossier est vide ou introuvable, on garde l'ancien comportement (split)
+            logging.warning("  - Stratified Val Set not found/empty. Falling back to random split.")
+            random.seed(42) 
+            random.shuffle(original_samples)
+            num_valid = int(valid_ratio * len(original_samples))
+            train_samples_orig = original_samples[num_valid:]
+            valid_samples = original_samples[:num_valid]
+
+
+        # 4. Construction du Training Set final
+        # On ajoute TOUTES les données Active Learning au Train (ce sont des cas durs)
+        full_train_samples = train_samples_orig + al_samples
+        
+        # 5. Calcul des poids pour le Sampler
+        # Poids 1.0 pour les données originales, Poids X pour les données AL
+        weights_orig = [1.0] * len(train_samples_orig)
+        weights_al = [al_weight_factor] * len(al_samples)
+        
+        sample_weights = weights_orig + weights_al
+        
+        # Création du Sampler
+        # num_samples : on peut définir combien d'images on tire par époque. 
+        # Ici, on garde la taille du dataset total.
+        sampler = WeightedRandomSampler(
+            weights=sample_weights,
+            num_samples=len(full_train_samples),
+            replacement=True
+        )
+
+        # 6. Création des Datasets
+        train_ds = PelgasDataset(
+            samples=full_train_samples, 
+            transform=get_train_transforms(data_config)
+        )
+
+        valid_ds = PelgasDataset(
+            samples=valid_samples, 
+            transform=get_valid_transforms(data_config)
+        )
+
+        # 7. Création des Loaders
+        train_loader = torch.utils.data.DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            sampler=sampler,      # <--- IMPORTANT : On utilise le sampler
+            shuffle=False,        # <--- IMPORTANT : shuffle doit être False avec un sampler
+            num_workers=num_workers,
+            pin_memory=use_cuda,
+            drop_last=True
+        )
+
+        valid_loader = torch.utils.data.DataLoader(
+            valid_ds,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=use_cuda,
+        )
+
+        logging.info(f"  - Final Train size: {len(train_ds)} (Orig: {len(train_samples_orig)} + AL: {len(al_samples)})")
+        logging.info(f"  - Valid size: {len(valid_ds)}")
+        if len(al_samples) > 0:
+            logging.info(f"  - AL Data Weighting: x{al_weight_factor}")
+
+        num_classes = 1
+        input_size = (3, resize, resize)
+
+        return train_loader, valid_loader, input_size, num_classes
