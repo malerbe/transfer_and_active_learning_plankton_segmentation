@@ -46,4 +46,4 @@ data/**
 
 *.jpg
 *.png
-!assets/
+!assets/*.png
