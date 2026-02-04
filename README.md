@@ -50,9 +50,9 @@ This experiment allowed to validate my intuition and to choose the best model fo
 However, the segmentation on ZooScanNet unlabelled images with this unaugmented training is really bad :
 
 <p align="center">
-  <img src="./assets/gridsearch_example1.png" width="600">
-  <img src="./assets/gridsearch_example2.png" width="600">
-  <img src="./assets/gridsearch_example3.png" width="600">
+  <img src="assets/gridsearch_example1.png" width="600">
+  <img src="assets/gridsearch_example2.png" width="600">
+  <img src="assets/gridsearch_example3.png" width="600">
 </p>
 
 Oversegmentation and noise are included, making this approach worse than a simple image processing pipeline.
