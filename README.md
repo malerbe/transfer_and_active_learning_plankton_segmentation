@@ -25,7 +25,7 @@ A custom annotation tool was built using Napari to manually annotation around 70
 
 #### Phase 2: Find an architecture and hyperparameters suitable for generalization
 
-The first step in my approach corresponds to finding an architecture and hyperparamters which will allow a model trained on PELGAS to be good enough for inference on the ZooScanNet dataset. 
+The first step in my approach corresponds to finding an architecture and hyperparamters which will allow a model trained on PELGAS to be good enough for inference on the ZooScanNet dataset. It also will be a good baseline. 
 
 Since training is fast, I experimented on two architectures and 12 combinations of hyperparameters in a gridsearch:
 
@@ -46,6 +46,16 @@ Overall, all models tend to overfit after a few epochs which is also not surpris
 This experiment allowed to validate my intuition and to choose the best model for transfer learning:
 
 (INCLUDE BEST MODEL AND PERFORMANCE)
+
+However, the segmentation on ZooScanNet unlabelled images with this unaugmented training is really bad :
+
+<p align="center">
+  <img src="./assets/gridsearch_example1.png" width="600">
+  <img src="./assets/gridsearch_example2.png" width="600">
+  <img src="./assets/gridsearch_example3.png" width="600">
+</p>
+
+Oversegmentation and noise are included, making this approach worse than a simple image processing pipeline.
 
 #### Phase 3: Find a set of augmentations to improve generalization
 
