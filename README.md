@@ -1,65 +1,75 @@
-# Template base code for pytorch
+# Plankton segmentation: A transfer learning and active learning approach
 
-This repository contains a template base code for a complete pytorch pipeline.
+Working on the [ZooScanNet](https://www.seanoe.org/data/00446/55741/) planktons dataset, I needed to get masks separation planktons from noise and background. 
 
-This is a template because it works on fake data but aims to illustrate some pythonic syntax allowing the pipeline to be modular.
+Difficulties:
+- Traditional image processing techniques were not easy to implement because of noise in the background
+- Using pre-trained models for segmentations like SAM was not successful as these models are usually trained on datasets such as ImageNet and that the domain shift is too important
+- From-scratch manual annotation is possible but time consuming (84 classes in the dataset)
 
-More specifically, this template base code aims to target :
+To answer the problem I made my own approach reducing the difficulties linked to the nature of the dataset:
 
-- modularity : allowing to change models/optimizers/ .. and their hyperparameters easily
-- reproducibility : saving the commit id, ensuring every run saves its assets in a different directory, recording a summary card for every experiment, building a virtual environnement
+### Transfer Learning
 
-For the last point, if you ever got a good model as an orphane pytorch tensor whithout being able to remember in which conditions, with which parameters and so on you got, you see what I mean. 
+To reduce the difficulty of manual image annotations I trained a model on a dataset with a cleaner background ([Pelgas Dataset](https://www.seanoe.org/data/00829/94052/)).
 
-## Usage
+Working on a cleaner dataset allowed to extract some masks using a traditionnal image processing method. 
 
-### Local experimentation
+The idea is to hope that a model trained on this dataset can perform good enough on the ZooScanDataset and allow me get a starting point for manual annotation which will save me a lot of time. 
 
-For a local experimentation, you start by setting up the environment :
+#### Phase 1: Annotation of a validation dataset
 
-```
-python3 -m virtualenv venv
-source venv/bin/activate
-python -m pip install .
-```
+For the next steps, I needed to annotate a validation set from the ZooScanNet dataset so that I could measure how good my future models perform. 
 
-Then you can run a training, by editing the yaml file, then 
+A custom annotation tool was built using Napari to manually annotation around 70 images from the goal dataset. 
 
-```
-python -m torchtmpl.main config.yml train
-```
+#### Phase 2: Find an architecture and hyperparameters suitable for generalization
 
-And for testing (**not yet implemented**)
+The first step in my approach corresponds to finding an architecture and hyperparamters which will allow a model trained on PELGAS to be good enough for inference on the ZooScanNet dataset. 
 
-```
-python main.py path/to/your/run test
-```
+Since training is fast, I experimented on two architectures and 12 combinations of hyperparameters in a gridsearch:
 
-### Cluster experimentation (**not yet implemented**)
+- Model 1: backbone: resnet34 + UNet
+- Model 2: backbone: resnet34 + DeepLabV3Plus
 
-For running the code on a cluster, we provide an example script for starting an experimentation on a SLURM based cluster.
+Among the hyperparaters, I included the decision to freeze or unfreeze the backbone. 
 
-The script we provide is dedicated to a use on our clusters and you may need to adapt it to your setting. 
+Unsurprisingly, simpler and unfrozen models performed better on my test set. This is due to:
+- The backbone being pretrained on ImageNet, and thus being able to extract features meaningful for a different yet wider domain of images;
+- More complex models overfitting faster on the train set
 
-Then running the simulation can be as simple as :
+Overall, all models tend to overfit after a few epochs which is also not surprising. 
 
-```
-python3 submit.py
-```
-
-## Testing the functions
-
-Every module/script is equiped with some test functions. Although these are not unitary tests per se, they nonetheless illustrate how to test the provided functions.
-
-For example, you can call :
+(INCLUDE TRAINING CURVES (train loss vs. valid loss over epochs))
 
 
-```
-python3 -m virtualenv venv
-source venv/bin/activate
-python -m pip install .
-python -m torchtmpl.models
-```
+This experiment allowed to validate my intuition and to choose the best model for transfer learning:
 
-and this will call the test functions in the `torchtmpl/models/__main__.py` script.
+(INCLUDE BEST MODEL AND PERFORMANCE)
+
+#### Phase 3: Find a set of augmentations to improve generalization
+
+The previous training were done with only very basic transformations. It is highly predicatible that heavier augmentations will result in better performances on the ZooScanNet dataset. To test this hypothesis and find the best set of augmentations, I followed advices from the [Albumentations documentation](https://albumentations.ai/docs/3-basic-usage/choosing-augmentations/) and made a set of 5 augmentations compositions.
+
+These compositions are:
+
+- 'basic': Resize + HorizontalFlip + VerticalFlip + Rotation
+- 'occlusion': All of the above + CoarseDropout
+- 'affine': All of the above + replacing Rotation by Affine augmentations
+- 'domain' All of the above +  GridDistortion + RandomGamma + ISONoise + Blurring + Downscale
+- 'specialized': All of the above + FDA/HistogramMatching
+
+((INCLUDE RESULTS FOR THESE TRAINING))
+
+### Active Learning
+
+At this point, I had a decently working model but there were still a lot of inconsistancies when infering on the ZooScanNet dataset. These inconsistancies were not acceptable for the intended application. Since annotation was expensive (I didn't have a lot of time to spend on it), I opted for an active learning approach.
+
+Challenge: Lack of diversity in the sampling of images to label: Prototyping this active learning phase showed me that the basic uncertainty sampling stategy lacked a lot of diversity (mostly showing eggs)
+
+To solve the problem, I made a method inspired by the paper [Active learning for medical image segmentation with stochastic batches](https://arxiv.org/abs/2301.07670). The idea is:
+
+- Instead of computing the uncertainty score on images individually, compute it on batches made from a random sampling in the available unlabelled images
+- Use TTA to estimate the uncertainty better
+
 
