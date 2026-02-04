@@ -1,14 +1,16 @@
-nepochs: 50
+nepochs: 10
 seed: 42
 
 data:
   trainpath: "./data/segmentation_dataset_cropped"
-  batch_size: 8        
+  batch_size: 16       
   num_workers: 4    
   valid_ratio: 0.2
-  resize: 224
-  active_learning: False
-  augmentations: basic
+  resize: 304
+  active_learning: True
+  al_path: "active_learning/pool_labelled"
+  val_path: "active_learning/validation_data_stratified"
+
 
 model:
   class: "DeepLabV3Plus"

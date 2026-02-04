@@ -21,6 +21,9 @@ class Unet(nn.Module):
             activation=None 
         )
 
+        self.encoder = self.model.encoder 
+
+
     def forward(self, x):
         return self.model(x)
 
@@ -40,6 +43,9 @@ class DeepLabV3(nn.Module):
             classes=num_classes,              
             activation=None
         )
+
+        self.encoder = self.model.encoder 
+
 
     def forward(self, x):
         return self.model(x)
@@ -61,6 +67,9 @@ class DeepLabV3Plus(nn.Module):
             activation=None
         )
 
+        self.encoder = self.model.encoder 
+
+
     def forward(self, x):
         return self.model(x)
 
@@ -79,6 +88,9 @@ class UnetPlusPlus(nn.Module):
             classes=num_classes,              
             activation=None
         )
+
+        self.encoder = self.model.encoder 
+
 
     def forward(self, x):
         return self.model(x)

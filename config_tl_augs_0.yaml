@@ -1,0 +1,18 @@
+nepochs: 1
+
+data:
+  trainpath: "./data/segmentation_dataset_cropped"
+  goalpath: "./active_learning/validation_data_stratified" 
+  resize: 256
+  batch_size: 16
+  num_workers: 4
+  valid_ratio: 0 # not activated for gridsearch, all the goal dataset test set is used
+  augmentations: "basic"
+
+optim:
+  algo: "AdamW"         
+
+loss: "TverskyLoss"
+
+logging:
+  logdir: "./logs"
