@@ -1,4 +1,4 @@
-nepochs: 10
+nepochs: 20
 
 data:
   trainpath: "./data/segmentation_dataset_cropped"
