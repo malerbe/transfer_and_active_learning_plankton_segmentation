@@ -69,7 +69,11 @@ These compositions are:
 - 'domain' All of the above +  GridDistortion + RandomGamma + ISONoise + Blurring + Downscale
 - 'specialized': All of the above + FDA/HistogramMatching
 
-((INCLUDE RESULTS FOR THESE TRAINING))
+The gain from this strategy is not great. Gains are low but visible going from basic to occlusion and from occlusion to affine, however the more risky approaches 'domain' and 'specialized' (FDA) only made it more difficult for the model to fit the train data without any gain on the test data:
+
+<p align="center">
+  <img src="assets/aug_curves.png" width="600">
+</p>
 
 ### Active Learning
 

@@ -23,7 +23,4 @@ optim:
     lr: 0.0009
     weight_decay: 0.01 
 
-loss: "TverskyLoss"
-
-logging:
-  logdir: "./logs"      
+loss: "TverskyLoss"      

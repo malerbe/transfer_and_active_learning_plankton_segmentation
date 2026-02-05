@@ -171,13 +171,15 @@ def train_transfer_learning_gridsearch(config):
 
     # Gridsearch augmentations
     grid_params = {
-        'learning_rate': [0.001],
+        'learning_rate': [0.001, 0.0001],
         'model_backbone': ['resnet34'],
-        'model': ['Unet'],
-        'freeze': [True],
+        'model': ['Unet', 'DeepLabV3Plus'],
+        'freeze': [True, False],
         'weight_decay': [1e-2],
         # 'augmentations': ["tl_occlusion_affine_domain_fda"]
-        'augmentations': ["tl_basic", "tl_occlusion", "tl_occlusion_affine", "tl_occlusion_affine_domain", "tl_occlusion_affine_domain_fda"]
+        # 'augmentations': ["tl_basic", "tl_occlusion", "tl_occlusion_affine", "tl_occlusion_affine_domain", "tl_occlusion_affine_domain_fda"]
+        'augmentations': ["tl_occlusion_affine_domain", "tl_occlusion_affine_domain_fda"]
+    
     }
 
 

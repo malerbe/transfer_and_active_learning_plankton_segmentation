@@ -224,20 +224,20 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             ),
 
             A.GridDistortion(num_steps=5,
-                             distort_limit=[-0.25, 0.25]),
-            A.RandomGamma(gamma_limit=[30, 100], p=0.5),
-            A.ISONoise(color_shift=[0.01, 0.05],
-                       intensity=[0.1, 0.5], p=0.3),
+                             distort_limit=[-0.30, 0.30]),
+            A.RandomGamma(gamma_limit=[40, 150], p=0.5),
+            A.ISONoise(color_shift=[0.02, 0.07],
+                       intensity=[0.15, 0.6], p=0.3),
             A.OneOf([
-                A.MotionBlur(blur_limit=[5, 15], p=0.3),
-                A.MedianBlur(blur_limit=[3, 7], p=0.3),
+                A.MotionBlur(blur_limit=[5, 17], p=0.3),
+                A.MedianBlur(blur_limit=[5, 9], p=0.3),
             ]),
             
             
-            A.Downscale(scale_min=0.5,
+            A.Downscale(scale_min=0.4,
                         scale_max=0.9,
                         interpolation=cv2.INTER_LINEAR,
-                        p=0.1),
+                        p=0.2),
 
             A.CoarseDropout(
                 min_holes=1,
@@ -288,7 +288,12 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             ),
 
             A.GridDistortion(num_steps=5,
-                             distort_limit=[-0.25, 0.25], p=0.3),
+                             distort_limit=[-0.30, 0.30]),
+            
+            A.Downscale(scale_min=0.4,
+                        scale_max=0.9,
+                        interpolation=cv2.INTER_LINEAR,
+                        p=0.2),
 
             A.OneOf([
                 A.HistogramMatching(
@@ -305,12 +310,12 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
                 ),
             ], p=0.6),
 
-            A.RandomGamma(gamma_limit=[30, 100], p=0.5),
-            A.ISONoise(color_shift=[0.01, 0.05],
-                       intensity=[0.1, 0.5], p=0.3),
+            A.RandomGamma(gamma_limit=[40, 150], p=0.5),
+            A.ISONoise(color_shift=[0.02, 0.07],
+                       intensity=[0.15, 0.6], p=0.3),
             A.OneOf([
-                A.MotionBlur(blur_limit=[5, 15], p=0.3),
-                A.MedianBlur(blur_limit=[3, 7], p=0.3),
+                A.MotionBlur(blur_limit=[5, 17], p=0.3),
+                A.MedianBlur(blur_limit=[5, 9], p=0.3),
             ]),
             
             
@@ -614,3 +619,43 @@ def get_dataloaders(data_config, use_cuda):
         input_size = (3, resize, resize)
 
         return train_loader, valid_loader, input_size, num_classes
+    
+import numpy as np
+def visualize_augmentations(image, mask, transform, n_samples=8):
+    """Visualise plusieurs applications d'une même transformation."""
+    fig, axes = plt.subplots(n_samples, 3, figsize=(12, 4*n_samples))
+    
+    for i in range(n_samples):
+        augmented = transform(image=image, mask=mask)
+        aug_img = augmented["image"]
+        aug_mask = augmented["mask"]
+        
+        # Dénormaliser pour affichage
+        if isinstance(aug_img, torch.Tensor):
+            aug_img = aug_img.permute(1, 2, 0).numpy()
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            aug_img = (aug_img * std + mean).clip(0, 1)
+        
+        axes[i, 0].imshow(image)
+        axes[i, 0].set_title("Original")
+        axes[i, 1].imshow(aug_img)
+        axes[i, 1].set_title(f"Augmented #{i+1}")
+        axes[i, 2].imshow(aug_mask, cmap='gray')
+        axes[i, 2].set_title("Mask")
+        
+        for ax in axes[i]:
+            ax.axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    # Test
+    from PIL import Image
+    img = np.array(Image.open(r".\data\segmentation_dataset_cropped\imgs\Actinopterygii__56693__372680245.jpg").convert("RGB"))
+    mask = np.array(Image.open(r".\data\segmentation_dataset_cropped\masks\Actinopterygii__56693__372680245.png").convert("L"))
+
+    data_config = {"resize": 256}
+    transform = get_train_transforms(data_config, aug_type="tl_occlusion_affine_domain_fda")
+    visualize_augmentations(img, mask, transform)
