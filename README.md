@@ -40,12 +40,7 @@ Unsurprisingly, simpler and unfrozen models performed better on my test set. Thi
 
 Overall, all models tend to overfit after a few epochs which is also not surprising. 
 
-(INCLUDE TRAINING CURVES (train loss vs. valid loss over epochs))
-
-
-This experiment allowed to validate my intuition and to choose the best model for transfer learning:
-
-(INCLUDE BEST MODEL AND PERFORMANCE)
+Best model reached 82% Dice score on the test set ; and a 0.162 TwerskyLoss ($\alpha=0.7$, $\beta$=0.3$). This is a promissing result.
 
 However, the segmentation on ZooScanNet unlabelled images with this unaugmented training is really bad :
 
@@ -69,10 +64,28 @@ These compositions are:
 - 'domain' All of the above +  GridDistortion + RandomGamma + ISONoise + Blurring + Downscale
 - 'specialized': All of the above + FDA/HistogramMatching
 
-The gain from this strategy is not great. Gains are low but visible going from basic to occlusion and from occlusion to affine, however the more risky approaches 'domain' and 'specialized' (FDA) only made it more difficult for the model to fit the train data without any gain on the test data:
+The gain from this strategy is not great **on paper**. Gains are low but visible going from basic to occlusion and from occlusion to affine, however the more risky approaches 'domain' and 'specialized' (FDA) only made it more difficult for the model to fit the train data without any gain on the test data:
 
 <p align="center">
-  <img src="assets/aug_curves.png" width="600">
+  <img src="assets/aug_curves.png" width="800">
+</p>
+
+Here are some results for unseen pictures from the 'affine' model:
+
+<p align="center">
+  <img src="assets/aug_example1.png" width="600">
+  <img src="assets/aug_example2.png" width="600">
+  <img src="assets/aug_example3.png" width="600">
+</p>
+
+##### "Sometimes metrics are just... metrics"
+
+Even though the dice score and the losses looked worse for the 'specialized' model, the gains are actually great. This shows that metrics must be chosen really carefully and analyzed for what they are. **Segmentations from this model actually look much better**:
+
+<p align="center">
+  <img src="assets/aug_fda_example1.png" width="600">
+  <img src="assets/aug_fda_example2.png" width="600">
+  <img src="assets/aug_fda_example3.png" width="600">
 </p>
 
 ### Active Learning
