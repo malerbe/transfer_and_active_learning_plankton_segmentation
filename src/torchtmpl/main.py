@@ -160,24 +160,26 @@ def train_transfer_learning_gridsearch(config):
     data_config = config["data"]
 
     # Gridsearch de base
-    grid_params = {
-        'learning_rate': [0.001, 0.0001, 0.0005],
-        'model_backbone': ['resnet34'],
-        'model': ['Unet', 'DeepLabV3Plus'],
-        'freeze': [True, False],
-        'weight_decay': [1e-4, 1e-2],
-        'augmentations': ['basic']
-    }
+    # grid_params = {
+    #     'learning_rate': [0.001, 0.0001, 0.0005],
+    #     'model_backbone': ['resnet34'],
+    #     'model': ['Unet', 'DeepLabV3Plus'],
+    #     'freeze': [True, False],
+    #     'weight_decay': [1e-4, 1e-2],
+    #     'augmentations': ['basic']
+    # }
 
     # Gridsearch augmentations
-    # grid_params = {
-    #     'learning_rate': [0.001],
-    #     'model_backbone': ['resnet34'],
-    #     'model': ['Unet'],
-    #     'freeze': [True],
-    #     'weight_decay': [1e-4],
-    #     'augmentations': ["tl_basic", "tl_occlusion", "tl_occlusion_affine", "tl_occlusion_affine_domain", "tl_occlusion_affine_domain_fda"]
-    # }
+    grid_params = {
+        'learning_rate': [0.001],
+        'model_backbone': ['resnet34'],
+        'model': ['Unet'],
+        'freeze': [True],
+        'weight_decay': [1e-2],
+        # 'augmentations': ["tl_occlusion_affine_domain_fda"]
+        'augmentations': ["tl_basic", "tl_occlusion", "tl_occlusion_affine", "tl_occlusion_affine_domain", "tl_occlusion_affine_domain_fda"]
+    }
+
 
     # grid_params = {
     #     'learning_rate': [0.001],
@@ -278,6 +280,15 @@ def train_transfer_learning_gridsearch(config):
 
         best_run_metrics = {}
 
+        epoch_history = {
+            "epochs": [],
+            "train_loss": [],
+            "test_loss": [],
+            "test_dice": [],
+            "test_iou": [],
+            "learning_rate": []
+        }
+
         for e in range(run_config["nepochs"]):
             # Train
             train_loss = utils.train(model, train_loader, loss_fn, optimizer, device)
@@ -290,9 +301,17 @@ def train_transfer_learning_gridsearch(config):
             
             # Checkpoint update
             is_best = model_checkpoint.update(test_loss)
+
+            # Save metrics for future analysis
+            current_lr = optimizer.param_groups[0]['lr']
+            epoch_history["epochs"].append(e + 1)
+            epoch_history["train_loss"].append(float(train_loss))
+            epoch_history["test_loss"].append(float(test_loss))
+            epoch_history["test_dice"].append(float(test_dice))
+            epoch_history["test_iou"].append(float(test_iou))
+            epoch_history["learning_rate"].append(float(current_lr))
             
             # Logging console
-            current_lr = optimizer.param_groups[0]['lr']
             logging.info(
                 "[%d/%d] Train Loss: %.5f | Test Loss: %.5f | Dice: %.4f | IoU: %.4f | LR: %.1e %s"
                 % (
@@ -316,6 +335,10 @@ def train_transfer_learning_gridsearch(config):
                     "test_dice": test_dice,
                     "test_iou": test_iou
                 }
+
+        history_path = os.path.join(run_logdir, "epoch_history.json")
+        with open(history_path, "w", encoding='utf-8') as f:
+            json.dump(epoch_history, f, indent=4)
 
         # Save all results
         result_entry = {

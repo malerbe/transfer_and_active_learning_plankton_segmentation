@@ -39,7 +39,7 @@ class PelgasDataset(Dataset):
              raise FileNotFoundError(f"Masque introuvable : {mask_path}")
 
         if self.transform:
-            augmented = self.transform(image=image, mask=mask, hm_metadata=[], fda_metadata=[])
+            augmented = self.transform(image=image, mask=mask)
             image = augmented['image']
             mask = augmented['mask']
         
@@ -166,9 +166,12 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.Rotate(limit=180, p=0.7, border_mode=cv2.BORDER_CONSTANT), 
 
             A.CoarseDropout(
-                num_holes_range=[1, 3],
-                hole_width_range=[int(resize * 0.1),  int(resize * 0.3)], 
-                hole_height_range=[int(resize * 0.1),  int(resize * 0.3)],            
+                min_holes=1,
+                max_holes=3,
+                min_width=int(resize * 0.1),
+                max_width=int(resize * 0.3),
+                min_height=int(resize * 0.1),
+                max_height=int(resize * 0.3),         
                 p=0.3
             ),
 
@@ -184,17 +187,20 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.VerticalFlip(p=0.5),
 
             A.Affine(
-                scale=(0.8, 1.2),      # Zoom in/out by 80-120%
+                scale=(0.90, 1.10),      # Zoom in/out by 80-120%
                 rotate=(-180, 180),      # Rotate by -15 to +15 degrees
-                translate_percent=(0, 0.1), # translate by 0-10%
-                shear=(-3, 3),          # shear by -10 to +10 degrees
+                translate_percent=(0, 0.05), # translate by 0-10%
+                shear=(-2, 2),          # shear by -10 to +10 degrees
                 p=0.8
             ),
 
             A.CoarseDropout(
-                num_holes_range=[1, 3],
-                hole_width_range=[int(resize * 0.1),  int(resize * 0.3)], 
-                hole_height_range=[int(resize * 0.1),  int(resize * 0.3)],            
+                min_holes=1,
+                max_holes=3,
+                min_width=int(resize * 0.1),
+                max_width=int(resize * 0.3),
+                min_height=int(resize * 0.1),
+                max_height=int(resize * 0.3),         
                 p=0.3
             ),
 
@@ -210,10 +216,10 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.VerticalFlip(p=0.5),
 
             A.Affine(
-                scale=(0.8, 1.2),      # Zoom in/out by 80-120%
+                scale=(0.90, 1.10),      # Zoom in/out by 80-120%
                 rotate=(-180, 180),      # Rotate by -15 to +15 degrees
-                translate_percent=(0, 0.1), # translate by 0-10%
-                shear=(-3, 3),          # shear by -10 to +10 degrees
+                translate_percent=(0, 0.05), # translate by 0-10%
+                shear=(-2, 2),          # shear by -10 to +10 degrees
                 p=0.8
             ),
 
@@ -223,19 +229,23 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.ISONoise(color_shift=[0.01, 0.05],
                        intensity=[0.1, 0.5], p=0.3),
             A.OneOf([
-                A.MotionBlur(blur_limit=[5, 15],
-                         angle_range=[0, 360],
-                         direction_range=[-1, 1], p=0.3),
+                A.MotionBlur(blur_limit=[5, 15], p=0.3),
                 A.MedianBlur(blur_limit=[3, 7], p=0.3),
             ]),
             
             
-            A.Downscale(scale_range=[0.5, 0.9], p=0.1),
+            A.Downscale(scale_min=0.5,
+                        scale_max=0.9,
+                        interpolation=cv2.INTER_LINEAR,
+                        p=0.1),
 
             A.CoarseDropout(
-                num_holes_range=[1, 3],
-                hole_width_range=[int(resize * 0.1),  int(resize * 0.3)], 
-                hole_height_range=[int(resize * 0.1),  int(resize * 0.3)],            
+                min_holes=1,
+                max_holes=3,
+                min_width=int(resize * 0.1),
+                max_width=int(resize * 0.3),
+                min_height=int(resize * 0.1),
+                max_height=int(resize * 0.3),         
                 p=0.3
             ),
 
@@ -258,7 +268,8 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
         
         refs = []
         for p in image_paths:
-            img = cv2.imread(p, cv2.IMREAD_GRAYSCALE) 
+            img = cv2.imread(p)  
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             img = cv2.resize(img, (resize, resize))
             refs.append(img)
 
@@ -269,10 +280,10 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.VerticalFlip(p=0.5),
 
             A.Affine(
-                scale=(0.8, 1.2),      # Zoom in/out by 80-120%
+                scale=(0.90, 1.10),      # Zoom in/out by 80-120%
                 rotate=(-180, 180),      # Rotate by -15 to +15 degrees
-                translate_percent=(0, 0.1), # translate by 0-10%
-                shear=(-3, 3),          # shear by -10 to +10 degrees
+                translate_percent=(0, 0.05), # translate by 0-10%
+                shear=(-2, 2),          # shear by -10 to +10 degrees
                 p=0.8
             ),
 
@@ -281,15 +292,15 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
 
             A.OneOf([
                 A.HistogramMatching(
-                    reference_images=ref_images,
-                    read_fn=identity_fn,   
+                    reference_images=refs,  # Utilise la variable 'refs' !
+                    read_fn=identity_fn,    # Fonction simple
                     blend_ratio=(0.2, 0.5),
                     p=1.0
                 ),
                 A.FDA(
-                    reference_images=ref_images,
+                    reference_images=refs,  # Utilise la variable 'refs' !
                     beta_limit=0.01,
-                    read_fn=identity_fn,      
+                    read_fn=identity_fn,    # Fonction simple
                     p=1.0
                 ),
             ], p=0.6),
@@ -298,19 +309,23 @@ def get_train_transforms(data_config, aug_type="al", ref_images=None):
             A.ISONoise(color_shift=[0.01, 0.05],
                        intensity=[0.1, 0.5], p=0.3),
             A.OneOf([
-                A.MotionBlur(blur_limit=[5, 15],
-                         angle_range=[0, 360],
-                         direction_range=[-1, 1], p=0.3),
+                A.MotionBlur(blur_limit=[5, 15], p=0.3),
                 A.MedianBlur(blur_limit=[3, 7], p=0.3),
             ]),
             
             
-            A.Downscale(scale_range=[0.5, 0.9], p=0.1),
+            A.Downscale(scale_min=0.5,
+                        scale_max=0.9,
+                        interpolation=cv2.INTER_LINEAR,
+                        p=0.1),
 
             A.CoarseDropout(
-                num_holes_range=[1, 3],
-                hole_width_range=[int(resize * 0.1),  int(resize * 0.3)], 
-                hole_height_range=[int(resize * 0.1),  int(resize * 0.3)],            
+                min_holes=1,
+                max_holes=3,
+                min_width=int(resize * 0.1),
+                max_width=int(resize * 0.3),
+                min_height=int(resize * 0.1),
+                max_height=int(resize * 0.3),         
                 p=0.3
             ),
 
