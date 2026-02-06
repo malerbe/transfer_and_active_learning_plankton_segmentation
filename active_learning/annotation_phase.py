@@ -23,14 +23,14 @@ LABELLED_POOL = "./active_learning/pool_labelled"
 
 # Model which will be used both for uncertainty sampling and to 
 # provide an initialization mask for the manual annotation
-PRE_TRAINED_MODEL = r".\logs\GridSearch_10\run_4_learning__rate__0_001__model__backbone__resnet34__model__DeepLabV3Plus__freeze__True__weight__decay_\best_model.pt"
+PRE_TRAINED_MODEL = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\logs\Unet_12\best_model.pt"
 
 # Model configuration
-MODEL_ARCH = "DeepLabV3Plus"      
+MODEL_ARCH = "Unet"      
 BACKBONE = "resnet34"
 PRETRAINED = False
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-IMG_SIZE = 224
+IMG_SIZE = 352
 input_size = (3, IMG_SIZE, IMG_SIZE)
 num_classes = 1
 
@@ -81,7 +81,8 @@ def select_uncertain_samples(model, unlabeled_dir, n_samples):
             # preprocess
             transform = transforms.Compose([
                 transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                A.ToGray(p=1.0),
             ])
 
             image = cv2.imread(str(img_path))
@@ -131,7 +132,7 @@ def select_uncertain_samples_stochastic(model, unlabeled_dir, n_samples, n_batch
     # huge, we don't check if some images are present in multiple batches
 
     print("CAUTION: Please make sure that the transformations used for uncertainty computation\
-          are the same as the one used the validation.")
+ are the same as the one used the validation.")
     model.eval()
     base_transform = A.Compose([
         A.Resize(width=IMG_SIZE, height=IMG_SIZE),
@@ -153,6 +154,7 @@ def select_uncertain_samples_stochastic(model, unlabeled_dir, n_samples, n_batch
             img_path = all_images[index]
 
             original_image = cv2.imread(str(img_path))
+            # print(img_path)
             original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
 
             # --- TTA ---

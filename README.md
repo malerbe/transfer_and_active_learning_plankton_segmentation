@@ -88,6 +88,8 @@ Even though the dice score and the losses looked worse for the 'specialized' mod
   <img src="assets/aug_fda_example3.png" width="600">
 </p>
 
+*Note: The two last models with higher augmentations were trained with an unfrozen backbone*
+
 ### Active Learning
 
 At this point, I had a decently working model but there were still a lot of inconsistancies when infering on the ZooScanNet dataset. These inconsistancies were not acceptable for the intended application. Since annotation was expensive (I didn't have a lot of time to spend on it), I opted for an active learning approach.
@@ -98,5 +100,41 @@ To solve the problem, I made a method inspired by the paper [Active learning for
 
 - Instead of computing the uncertainty score on images individually, compute it on batches made from a random sampling in the available unlabelled images
 - Use TTA to estimate the uncertainty better
+
+#### Configuration
+
+For the trainings, I will use the 'specialized' augmentations and exactly the same configuration as the best model trained with them until now. Train dataset will be composed of the 4482 samples from the Pelgas dataset + $20 \times$ (number of iterations done) samples from the ZooScanNet dataset. The samples will be sampled using a weighted sampler, with weights $10/times$ bigger for samples annotated by hand. 
+
+Starting from the third iteration of annotation, the amount of epochs used for training was increased by $2$ at each new iteration and the resize was augmented by $16$ for both width and height. This decision was taken as I realized that most probably, very thin lines were not only too difficult to segment for the model and were compressed sometimes so much that the annotated mask disappeared for these zones.*
+
+Increasing these parameters gradually and not just once and for all allowed me to make the training phases much shorter. The model didn't really have enough clean annotations to be trained on to really be good at segmenting more difficult features. 
+
+#### Observations
+
+At the beginning, the algorithm was too bad to really be helpful during the annotation phase (although, good enough for the simplest classes). The active learning algorithm worked so great that I could see clearly huge improvements at every steps, even though the amount of manually annotated images was very small ($20$ to $100$ during the first $5$ iterations vs. $4482$ from Pelgas):
+
+- During the 1st and 2nd annotation phases, I manually reannotated $19/20$ images
+- During the 3rd annotation phase, I manually reannotated $17/20$ images
+- During the 4rd and 5th annotation phase, I manually reannotated $16/20$ images
+- During the 6th annotation phase, I manually reannotated $13/20$ images
+- During the 7th annotation phase, I manually reannotated $10/20$ images, **dividing by $2$ the amount of time spent for reannotation**
+
+Because of the change of parameters at each iteration (*), it is not possible to provide a curve to see how the training improved iteration by iteration. I stopped after $10$ iterations as the "annotation budget" (i.e. my will to spend more time annotating) ended. 
+
+#### Phase 4: Final training
+
+The final training was done with the same parameters. The total number of manual annotations on ZooScanNet was $200$ annotation done during the previous phase + $200$ annotations done during the prototyping of my scripts (with a much less efficient approach, e.g. uncertainty sampling done with a classic approach). 
+
+The hyperparameters used were:
+
+- batch size: $8$ (divided by $2$ vs. phase $3$ so that batches could fit on my $8$ GB $VRAM)
+- image resize: $448$
+
+### Limitations:
+
+- The choice of the architecture is not optimal: the dimensions of images are an a very wide interval, a transformer would be probably more efficient. The chosen architecture was made to allow me to train my models and iterate fast as well as make everything fit on an 8 GB RTX 2000;
+- Some images are so small/noisy that it is sometimes very difficult even for a human to make a mask;
+
+
 
 

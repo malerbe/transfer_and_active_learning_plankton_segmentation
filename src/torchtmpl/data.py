@@ -583,7 +583,7 @@ def get_dataloaders(data_config, use_cuda):
         # 6. Création des Datasets
         train_ds = PelgasDataset(
             samples=full_train_samples, 
-            transform=get_train_transforms(data_config, augmentations=augmentations)
+            transform=get_train_transforms(data_config, aug_type=augmentations)
         )
 
         valid_ds = PelgasDataset(

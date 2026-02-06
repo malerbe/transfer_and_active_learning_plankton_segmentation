@@ -100,6 +100,13 @@ def train(config):
     if wandb_log is not None:
         wandb.log({"summary": summary_text})
 
+    logging.info("= Building lr-scheduler")
+    patience = 3
+    factor = 0.5
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=factor, patience=patience
+    )
+
     # Define the early stopping callback
     model_checkpoint = utils.ModelCheckpoint(
         model, str(logdir / "best_model.pt"), min_is_best=True
@@ -112,19 +119,27 @@ def train(config):
         # Test
         test_loss, test_dice, test_iou = utils.test(model, valid_loader, loss, device, num_classes)
 
-        updated = model_checkpoint.update(test_loss)
+        # Step Scheduler based on validation loss
+        scheduler.step(test_loss)
         
+        # Checkpoint update
+        is_best = model_checkpoint.update(test_loss)
+        
+        # Logging console
+        current_lr = optimizer.param_groups[0]['lr']
         logging.info(
-            "[%d/%d] Test Loss: %.5f | Dice: %.5f | IoU: %.5f %s"
-            % (
-                e,
-                config["nepochs"],
-                test_loss,
-                test_dice,
-                test_iou,
-                "[>> BETTER <<]" if updated else "",
+                "[%d/%d] Train Loss: %.5f | Test Loss: %.5f | Dice: %.4f | IoU: %.4f | LR: %.1e %s"
+                % (
+                    e + 1,
+                    config["nepochs"],
+                    train_loss,
+                    test_loss,
+                    test_dice,
+                    test_iou,
+                    current_lr,
+                    "[>> BEST <<]" if is_best else "",
+                )
             )
-        )
 
         # Update the dashboard
         metrics = {
