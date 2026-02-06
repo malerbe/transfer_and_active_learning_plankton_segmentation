@@ -1,4 +1,4 @@
-nepochs: 30
+nepochs: 8
 seed: 42
 
 data:
@@ -6,7 +6,7 @@ data:
   batch_size: 8    
   num_workers: 4    
   valid_ratio: 0.2
-  resize: 448
+  resize: 512
   active_learning: True
   al_path: "active_learning/pool_labelled"
   val_path: "active_learning/validation_data_stratified"
@@ -21,7 +21,7 @@ model:
 optim:
   algo: "AdamW"         
   params:
-    lr: 0.01
+    lr: 0.001
     weight_decay: 0.01 
 
 loss: "TverskyLoss"

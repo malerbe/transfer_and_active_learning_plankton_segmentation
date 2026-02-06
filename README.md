@@ -127,7 +127,7 @@ The final training was done with the same parameters. The total number of manual
 
 The hyperparameters used were:
 
-- batch size: $8$ (divided by $2$ vs. phase $3$ so that batches could fit on my $8$ GB $VRAM)
+- batch size: $8$ (divided by $2$ vs. phase $3$ so that batches could fit on my $8$ GB VRAM)
 - image resize: $448$
 
 ### Limitations:
@@ -136,5 +136,7 @@ The hyperparameters used were:
 - Some images are so small/noisy that it is sometimes very difficult even for a human to make a mask;
 
 
-
+<p align="center">
+  <img src="assets/demo_plankton_tta.gif" width="600">
+</p>
 
