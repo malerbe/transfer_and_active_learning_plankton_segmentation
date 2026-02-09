@@ -23,7 +23,8 @@ LABELLED_POOL = "./active_learning/pool_labelled"
 
 # Model which will be used both for uncertainty sampling and to 
 # provide an initialization mask for the manual annotation
-PRE_TRAINED_MODEL = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\logs\Unet_21\best_model.pt"
+logs_dir = r"...\logs"
+PRE_TRAINED_MODEL = logs_dir + r"\Unet_21\best_model.pt"
 
 # Model configuration
 MODEL_ARCH = "Unet"      

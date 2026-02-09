@@ -49,3 +49,10 @@ data/**
 *.jpg
 *.png
 !assets/*.png
+
+*.yam
+
+/active_learning/pool_labelled/*
+/active_learning/pool_labelled_old/*
+/active_learning/pool_unlabelled/*
+/active_learning/validation_data_stratified/*
