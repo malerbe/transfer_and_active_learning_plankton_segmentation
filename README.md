@@ -1,5 +1,16 @@
 # Plankton segmentation: A transfer learning and active learning approach
 
+## Quick presentation
+
+This project addresses the challenge of separating plankton from noisy backgrounds in microscopy images (ZooScanNet dataset). The goal is to generate precise **binary masks** (Object vs. Background) despite a domain shift and a scarcity of annotations.
+
+**Key points:**
+*   Designed a **Transfer Learning** strategy from a clean dataset (Pelgas) to a noisy one (ZooScanNet).
+*   Implemented a **Human-in-the-loop Active Learning** pipeline to iteratively improve the binary masks with minimal manual effort.
+*   Implemented a uncertainty sampling strategy inspired by the paper [Active learning for medical image segmentation with stochastic batches](https://arxiv.org/abs/2301.07670)
+
+## Full presentation
+
 Working on the [ZooScanNet](https://www.seanoe.org/data/00446/55741/) planktons dataset, I needed to get masks separation planktons from noise and background. 
 
 Difficulties:
