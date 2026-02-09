@@ -3,7 +3,7 @@ seed: 42
 
 data:
   trainpath: "./data/segmentation_dataset_cropped"
-  batch_size: 8    
+  batch_size: 8   
   num_workers: 4    
   valid_ratio: 0.2
   resize: 512
@@ -24,7 +24,7 @@ optim:
     lr: 0.001
     weight_decay: 0.01 
 
-loss: "TverskyLoss"
+loss: "DiceFocalLoss"
 
 logging:
   logdir: "./logs"      

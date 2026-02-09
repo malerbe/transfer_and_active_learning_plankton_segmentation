@@ -17,20 +17,20 @@ from napari_annotation_script import *
 #######################
 # Configuration
 #######################
-SAMPLES_PER_ITERATION = 20
+SAMPLES_PER_ITERATION = 10
 UNLABELLED_POOL = "./active_learning/pool_unlabelled"
 LABELLED_POOL = "./active_learning/pool_labelled"
 
 # Model which will be used both for uncertainty sampling and to 
 # provide an initialization mask for the manual annotation
-PRE_TRAINED_MODEL = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\logs\Unet_12\best_model.pt"
+PRE_TRAINED_MODEL = r"C:\Users\223120964.HCAD\OneDrive - GEHealthCare\Desktop\transfer_and_active_learning_plankton_segmentation\logs\Unet_21\best_model.pt"
 
 # Model configuration
 MODEL_ARCH = "Unet"      
 BACKBONE = "resnet34"
 PRETRAINED = False
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-IMG_SIZE = 352
+IMG_SIZE = 512
 input_size = (3, IMG_SIZE, IMG_SIZE)
 num_classes = 1
 
